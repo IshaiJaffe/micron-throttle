@@ -24,6 +24,8 @@ function Throttle () {
 
     self.burst      = 25;
     self.rate       = 10;
+    self.timeFrame  = 1000;
+    self.onThrottle = null;
     self.ip         = false;
     self.xff        = false;
     self.username   = false;
@@ -51,6 +53,7 @@ function Throttle () {
         // Check the overrides
         var burst = self.burst;
         var rate = self.rate;
+        var timeFrame = self.timeFrame;
         if (self.overrides &&
             self.overrides[attr] &&
             self.overrides[attr].burst !== undefined &&
@@ -65,13 +68,16 @@ function Throttle () {
         if (!bucket) {
             bucket = new TokenBucket({
                 capacity: burst,
-                fillRate: rate
+                fillRate: rate,
+                timeFrame:timeFrame
             });
             self.table.set(attr, bucket);
         }
 
         // Throttle request
         if (!bucket.consume(1)) {
+            if(self.onThrottle)
+                self.onThrottle(attr);
             // Until https://github.com/joyent/node/pull/2371 is in
             var msg = sprintf(MESSAGE, rate);
             res.writeHead(429, 'application/json');
@@ -152,3 +158,12 @@ function Throttle () {
 }
 
 module.exports = new Throttle();
+/**
+ * Create new instance
+ * Using the regular API, multiple instances all work with the settings of the last instance
+ * @param options
+ * @returns rateLimit function
+ */
+module.exports.createInstance = function(options){
+    return (new Throttle())(options);
+};
